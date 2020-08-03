@@ -2,6 +2,21 @@ const db = require("../models");
 const Book = db.books;
 const Op = db.Sequelize.Op;
 
+const getPagination = (page, size) => {
+  const limit = size ? +size : 3;
+  const offset = page ? page * limit : 0;
+
+  return { limit, offset };
+};
+
+const getPagingData = (data, page, limit) => {
+  const { count: totalItems, rows: books } = data;
+  const currentPage = page ? +page : 0;
+  const totalPages = Math.ceil(totalItems / limit);
+
+  return { totalItems, books, totalPages, currentPage };
+};
+
 // Create and Save a new Tutorial
 exports.create = (req, res) => {
 
@@ -33,19 +48,22 @@ exports.create = (req, res) => {
   });
 };
 
-// Retrieve all Tutorials from the database.
+// Retrieve all books from the database.
 exports.findAll = (req, res) => {
-  const title = req.query.title;
+  const {page, size, title} = req.query;
   var condition = title ? { title: { [Op.like]: `%${title}%` } } : null;
 
-  Book.findAll({ where:condition })
+  const { limit, offset } = getPagination(page, size);
+
+  Book.findAndCountAll({ where:condition, limit, offset })
     .then(data => {
-      res.send(data);
+      const response = getPagingData(data, page, limit);
+      res.send(response);
     })
     .catch(err => {
       res.status(500).send({
         message:
-          err.message || "Some error ocurred while creating the book."
+          err.message || "Some error ocurred while retrieving the book."
       });
     });
 };
@@ -117,7 +135,7 @@ exports.delete = (req, res) => {
   });
 };
 
-// Delete all Tutorials from the database.
+// Delete all Books from the database.
 exports.deleteAll = (req, res) => {
   Book.destroy({
     where: {},
@@ -136,11 +154,15 @@ exports.deleteAll = (req, res) => {
   });
 };
 
-// Find all published Tutorials
+// Find all published Books
 exports.findAllPublished = (req, res) => {
-  Book.findAll({ where: {published: true } })
+  const { page, size } = req.query;
+  const { limit, offset } = getPagination(page, size);
+
+  Book.findAndCountAll({ where: {published: true }, limit, offset })
   .then(data => {
-    res.send(data);
+    const response = getPagingData(data, page, limit);
+    res.send(response);
   })
   .catch(err => {
     res.status(500).send({
